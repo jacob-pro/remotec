@@ -3,10 +3,12 @@ mod config;
 mod rdp;
 mod select;
 mod ssh;
+mod tunnel;
 
 use crate::config::Config;
 use crate::rdp::launch_rdp;
 use crate::ssh::launch_ssh;
+use crate::tunnel::launch_tunnel;
 use anyhow::Context;
 use clap::{Args, Parser};
 use env_logger::{Env, Target};
@@ -24,6 +26,8 @@ enum Subcommand {
     Rdp(Rdp),
     /// Launch an SSH connection
     Ssh(Ssh),
+    /// Open SSH tunnel(s)
+    Tunnel(Tunnel),
     /// Open config file
     Config,
 }
@@ -53,9 +57,7 @@ pub struct Rdp {
 }
 
 #[derive(Args)]
-pub struct Ssh {
-    /// Name of the SSH profile to launch
-    name: String,
+pub struct SshCommon {
     /// Connect via IPv4 address
     #[clap(long)]
     ipv4: bool,
@@ -71,6 +73,22 @@ pub struct Ssh {
     /// Print the command to stdout instead of connecting
     #[clap(long)]
     stdout: bool,
+}
+
+#[derive(Args)]
+pub struct Ssh {
+    /// Name of the SSH profile to launch
+    name: String,
+    #[clap(flatten)]
+    common: SshCommon,
+}
+
+#[derive(Args)]
+pub struct Tunnel {
+    /// Name of the tunnel profile to launch
+    name: String,
+    #[clap(flatten)]
+    common: SshCommon,
 }
 
 fn main() {
@@ -89,6 +107,7 @@ fn run(args: Cli) -> anyhow::Result<()> {
     match args.subcommand {
         Subcommand::Rdp(rdp) => launch_rdp(&config, &rdp),
         Subcommand::Ssh(ssh) => launch_ssh(&config, &ssh),
+        Subcommand::Tunnel(tunnel) => launch_tunnel(&config, &tunnel),
         Subcommand::Config => {
             let cfg_path = config::config_path()?;
             open::that(&cfg_path).context("Unable to open config file")

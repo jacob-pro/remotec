@@ -1,4 +1,4 @@
-use crate::config::{RdpProfile, SshProfile};
+use crate::config::{RdpProfile, SshProfile, TunnelProfile};
 use anyhow::Context;
 
 pub trait NamedProfile {
@@ -17,16 +17,23 @@ impl NamedProfile for SshProfile {
     }
 }
 
+impl NamedProfile for TunnelProfile {
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
 pub fn select_profile_by_name<'a, T: NamedProfile>(
+    profile_type: &'static str,
     list: &'a [T],
     name: &str,
 ) -> anyhow::Result<&'a T> {
     let matched = list.iter().filter(|t| t.name() == name).collect::<Vec<_>>();
     if matched.len() > 1 {
-        log::warn!("Found multiple profiles found for `{name}` - using first");
+        log::warn!("Found multiple {profile_type} profiles found for `{name}` - using first");
     }
     matched
         .into_iter()
         .next()
-        .context(format!("No profile found for `{name}`"))
+        .context(format!("No {profile_type} profile found for `{name}`"))
 }

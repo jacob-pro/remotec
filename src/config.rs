@@ -21,6 +21,8 @@ struct SatelliteConfig {
     rdp: Vec<RdpProfile>,
     #[serde(default)]
     ssh: Vec<SshProfile>,
+    #[serde(default)]
+    tunnels: Vec<TunnelProfile>,
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -77,6 +79,20 @@ pub struct SshProfile {
 }
 
 #[derive(Deserialize, Serialize)]
+pub struct TunnelProfile {
+    pub name: String,
+    pub ssh_profile: String,
+    pub forwards: Vec<SshForwardArgument>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct SshForwardArgument {
+    pub local_port: u16,
+    pub remote_port: u16,
+    pub remote_host: String,
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct SshJumpHost {
     pub username: Option<String>,
     pub hostname: String,
@@ -86,6 +102,7 @@ pub struct SshJumpHost {
 pub struct Config {
     pub rdp: Vec<RdpProfile>,
     pub ssh: Vec<SshProfile>,
+    pub tunnels: Vec<TunnelProfile>,
     pub rdp_defaults: RdpDefaults,
     pub ssh_defaults: SshDefaults,
 }
@@ -122,6 +139,7 @@ impl Config {
         let mut config = Config {
             rdp: cfg_file.this.rdp,
             ssh: cfg_file.this.ssh,
+            tunnels: cfg_file.this.tunnels,
             rdp_defaults: cfg_file.rdp_defaults,
             ssh_defaults: cfg_file.ssh_defaults,
         };
@@ -129,6 +147,7 @@ impl Config {
             if let Some(mut s) = load_satellite_config(&s) {
                 config.rdp.append(&mut s.rdp);
                 config.ssh.append(&mut s.ssh);
+                config.tunnels.append(&mut s.tunnels);
             }
         }
         Ok(config)

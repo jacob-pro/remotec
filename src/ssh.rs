@@ -1,11 +1,11 @@
 use crate::config::{SshJumpHost, SshProfile};
 use crate::select::select_profile_by_name;
-use crate::{Config, Ssh};
+use crate::{Config, Ssh, SshCommon};
 use anyhow::{bail, Context};
 use std::process::Command;
 
-pub fn launch_ssh(config: &Config, cli: &Ssh) -> anyhow::Result<()> {
-    let profile = select_profile_by_name(&config.ssh, &cli.name)?;
+pub fn ssh_args(config: &Config, cli: &SshCommon, profile: &str) -> anyhow::Result<Vec<String>> {
+    let profile = select_profile_by_name("SSH", &config.ssh, profile)?;
     let jumps = jump_hosts(profile, cli)?;
     let address = profile.address.choose_address(cli.ipv4, cli.ipv6)?;
     let username = username(profile, config);
@@ -31,10 +31,12 @@ pub fn launch_ssh(config: &Config, cli: &Ssh) -> anyhow::Result<()> {
             .unwrap_or_else(String::new);
         args.push(format!("{username}@{}{port}", address));
     }
+    Ok(args)
+}
 
+pub fn invoke_ssh(args: Vec<String>, stdout: bool) -> anyhow::Result<()> {
     let command = format!("ssh {}", args.join(" "));
-
-    if cli.stdout {
+    if stdout {
         println!("{}", command);
     } else {
         log::info!("Invoking: `{}`", command);
@@ -43,11 +45,19 @@ pub fn launch_ssh(config: &Config, cli: &Ssh) -> anyhow::Result<()> {
             .status()
             .context("Error invoking ssh")?;
     }
-
     Ok(())
 }
 
-fn jump_hosts<'a>(profile: &'a SshProfile, cli: &Ssh) -> anyhow::Result<Vec<&'a SshJumpHost>> {
+pub fn launch_ssh(config: &Config, cli: &Ssh) -> anyhow::Result<()> {
+    let args = ssh_args(config, &cli.common, &cli.name)?;
+    invoke_ssh(args, cli.common.stdout)?;
+    Ok(())
+}
+
+fn jump_hosts<'a>(
+    profile: &'a SshProfile,
+    cli: &SshCommon,
+) -> anyhow::Result<Vec<&'a SshJumpHost>> {
     if cli.use_jump_hosts {
         if profile.jump_hosts.is_empty() {
             bail!("Profile doesn't contain any jumphosts");
