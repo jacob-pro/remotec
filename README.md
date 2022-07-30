@@ -1,2 +1,3 @@
 # remotec
-CLI launcher for RDP and SSH
+
+'remote-cee': A CLI launcher for RDP and SSH.
