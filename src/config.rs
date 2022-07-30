@@ -27,6 +27,8 @@ pub struct RdpDefaults {
     pub backend: Option<RdpBackend>,
 }
 
+/// At present we only support launching the Microsoft Windows Remote Desktop client (mstsc.exe)
+/// But in future we could support Linux clients etc.
 #[derive(Deserialize, Serialize, Copy, Clone)]
 pub enum RdpBackend {
     #[cfg(windows)]

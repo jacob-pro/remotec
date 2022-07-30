@@ -23,6 +23,7 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Cargo Clippy Check
+        if: ${{ matrix.os == 'windows-latest' }}
         run: cargo clippy --all-features --workspace -- -D warnings
 
       - name: Cargo Sort Check
