@@ -113,7 +113,7 @@ impl RdpBackend {
                     .context("Unable to launch Microsoft Remote Desktop")?;
             }
             #[allow(unreachable_patterns)]
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
         Ok(())
     }
