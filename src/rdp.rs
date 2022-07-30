@@ -102,6 +102,7 @@ impl RdpBackend {
 
     fn open(&self, rdp_file: &Path, edit: bool) -> anyhow::Result<()> {
         match &self {
+            #[cfg(windows)]
             RdpBackend::Mstsc => {
                 let mut cmd = Command::new("mstsc");
                 if edit {
