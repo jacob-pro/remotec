@@ -2,9 +2,11 @@ mod address;
 mod config;
 mod rdp;
 mod select;
+mod ssh;
 
 use crate::config::Config;
 use crate::rdp::launch_rdp;
+use crate::ssh::launch_ssh;
 use anyhow::Context;
 use clap::{Args, Parser};
 use env_logger::{Env, Target};
@@ -21,20 +23,20 @@ enum Subcommand {
     /// Launch an RDP connection
     Rdp(Rdp),
     /// Launch an SSH connection
-    Ssh,
+    Ssh(Ssh),
     /// Open config file
     Config,
 }
 
 #[derive(Args)]
 pub struct Rdp {
-    /// Name of the RDP config to launch
+    /// Name of the RDP profile to launch
     name: String,
     /// Connect via IPv4 address
     #[clap(long)]
     ipv4: bool,
-    /// Connect via IPv4 address
-    #[clap(long)]
+    /// Connect via IPv6 address
+    #[clap(long, conflicts_with = "ipv4")]
     ipv6: bool,
     /// Connect using the remote desktop gateway
     #[clap(long, short = 'g')]
@@ -48,6 +50,27 @@ pub struct Rdp {
     /// Open the profile in edit mode instead of connecting
     #[clap(long, conflicts_with = "stdout")]
     edit: bool,
+}
+
+#[derive(Args)]
+pub struct Ssh {
+    /// Name of the SSH profile to launch
+    name: String,
+    /// Connect via IPv4 address
+    #[clap(long)]
+    ipv4: bool,
+    /// Connect via IPv6 address
+    #[clap(long, conflicts_with = "ipv4")]
+    ipv6: bool,
+    /// Connect using the jump hosts
+    #[clap(long, short = 'j')]
+    use_jump_hosts: bool,
+    /// Connect directly (without jump hosts)
+    #[clap(long, short, conflicts_with = "use-jump-hosts")]
+    disable_jump_hosts: bool,
+    /// Print the command to stdout instead of connecting
+    #[clap(long)]
+    stdout: bool,
 }
 
 fn main() {
@@ -65,7 +88,7 @@ fn run(args: Cli) -> anyhow::Result<()> {
     let config = Config::load()?;
     match args.subcommand {
         Subcommand::Rdp(rdp) => launch_rdp(&config, &rdp),
-        Subcommand::Ssh => unimplemented!(),
+        Subcommand::Ssh(ssh) => launch_ssh(&config, &ssh),
         Subcommand::Config => {
             let cfg_path = config::config_path()?;
             open::that(&cfg_path).context("Unable to open config file")

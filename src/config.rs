@@ -11,6 +11,8 @@ struct ConfigFile {
     this: SatelliteConfig,
     #[serde(default)]
     rdp_defaults: RdpDefaults,
+    #[serde(default)]
+    ssh_defaults: SshDefaults,
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -18,13 +20,18 @@ struct SatelliteConfig {
     #[serde(default)]
     rdp: Vec<RdpProfile>,
     #[serde(default)]
-    ssh: Vec<RdpProfile>,
+    ssh: Vec<SshProfile>,
 }
 
 #[derive(Deserialize, Serialize, Default)]
 pub struct RdpDefaults {
     pub username: Option<String>,
     pub backend: Option<RdpBackend>,
+}
+
+#[derive(Deserialize, Serialize, Default)]
+pub struct SshDefaults {
+    pub username: Option<String>,
 }
 
 /// At present we only support launching the Microsoft Windows Remote Desktop client (mstsc.exe)
@@ -57,10 +64,30 @@ pub struct RdpProfile {
     pub separate_credentials: bool,
 }
 
+#[derive(Deserialize, Serialize)]
+pub struct SshProfile {
+    pub name: String,
+    #[serde(flatten)]
+    pub address: Address,
+    pub username: Option<String>,
+    #[serde(default)]
+    pub disable_jump_hosts: bool,
+    #[serde(default)]
+    pub jump_hosts: Vec<SshJumpHost>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct SshJumpHost {
+    pub username: Option<String>,
+    pub hostname: String,
+    pub port: Option<u16>,
+}
+
 pub struct Config {
     pub rdp: Vec<RdpProfile>,
-    pub ssh: Vec<RdpProfile>,
+    pub ssh: Vec<SshProfile>,
     pub rdp_defaults: RdpDefaults,
+    pub ssh_defaults: SshDefaults,
 }
 
 pub fn config_path() -> anyhow::Result<PathBuf> {
@@ -96,6 +123,7 @@ impl Config {
             rdp: cfg_file.this.rdp,
             ssh: cfg_file.this.ssh,
             rdp_defaults: cfg_file.rdp_defaults,
+            ssh_defaults: cfg_file.ssh_defaults,
         };
         for s in cfg_file.include {
             if let Some(mut s) = load_satellite_config(&s) {

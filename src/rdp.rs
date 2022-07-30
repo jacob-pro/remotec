@@ -1,6 +1,5 @@
 // See: https://docs.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/rdp-files
 
-use crate::address::choose_address;
 use crate::config::{GatewayPolicy, RdpBackend, RdpProfile};
 use crate::select::select_profile_by_name;
 use crate::{Config, Rdp};
@@ -26,7 +25,7 @@ pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
     let mut rdp_config = Vec::new();
     let mut address_base = format!(
         "full address:s:{}",
-        choose_address(&profile.address, cli.ipv4, cli.ipv6)?
+        profile.address.choose_address(cli.ipv4, cli.ipv6)?
     );
     if let Some(port) = profile.address.port {
         write!(address_base, ":{}", port).unwrap();
