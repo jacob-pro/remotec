@@ -56,7 +56,7 @@ pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
         };
 
         let dest = cache_directory()?
-            .join(format!("rdp-{}", profile.name))
+            .join(format!("remotec-{}", profile.name))
             .with_extension("rdp");
         fs::write(&dest, &rdp_config).context("Unable to write RDP config")?;
 
@@ -112,6 +112,8 @@ impl RdpBackend {
                 cmd.spawn()
                     .context("Unable to launch Microsoft Remote Desktop")?;
             }
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!()
         }
         Ok(())
     }
