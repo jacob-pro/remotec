@@ -5,6 +5,7 @@ use crate::config::{GatewayPolicy, RdpBackend, RdpProfile};
 use crate::select::select_profile_by_name;
 use crate::{Config, Rdp};
 use anyhow::{bail, Context};
+use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -23,10 +24,14 @@ pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
     let profile = select_profile_by_name(&config.rdp, &cli.name)?;
 
     let mut rdp_config = Vec::new();
-    rdp_config.push(format!(
+    let mut address_base = format!(
         "full address:s:{}",
         choose_address(&profile.address, cli.ipv4, cli.ipv6)?
-    ));
+    );
+    if let Some(port) = profile.address.port {
+        write!(address_base, ":{}", port).unwrap();
+    };
+    rdp_config.push(address_base);
     rdp_config.push(format!("username:s:{}", username(profile, config)));
     if let Some(value) = &profile.domain {
         rdp_config.push(format!("domain:s:{value}"))

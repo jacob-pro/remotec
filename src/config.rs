@@ -40,6 +40,7 @@ pub struct Address {
     pub hostname: Option<String>,
     pub ipv4: Option<String>,
     pub ipv6: Option<String>,
+    pub port: Option<u16>,
 }
 
 #[derive(Deserialize, Serialize)]
