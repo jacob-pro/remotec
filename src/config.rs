@@ -50,6 +50,8 @@ pub struct RdpProfile {
     pub gateway: Option<String>,
     #[serde(default)]
     pub gateway_policy: GatewayPolicy,
+    #[serde(default)]
+    pub separate_credentials: bool,
 }
 
 pub struct Config {

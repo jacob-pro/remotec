@@ -38,9 +38,12 @@ pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
         "gatewayusagemethod:i:{}",
         gateway_policy(profile, cli)? as u8
     ));
-    rdp_config.push("gatewayprofileusagemethod:s:1".to_string());
-    rdp_config.push("gatewaycredentialssource:s:4".to_string());
-    rdp_config.push("gatewaybrokeringtype:i:0".to_string());
+    rdp_config.push("gatewayprofileusagemethod:i:1".to_string());
+    rdp_config.push(format!(
+        "promptcredentialonce:i:{}",
+        profile.separate_credentials.then_some(0).unwrap_or(1)
+    ));
+    rdp_config.push("".to_string());
 
     let rdp_config = rdp_config.join("\n");
 
