@@ -83,6 +83,7 @@ pub struct TunnelProfile {
     pub name: String,
     pub ssh_profile: String,
     pub forwards: Vec<SshForwardArgument>,
+    pub open: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]

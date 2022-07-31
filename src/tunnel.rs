@@ -3,6 +3,8 @@ use crate::select::select_profile_by_name;
 use crate::ssh::{invoke_ssh, ssh_args};
 use crate::{Config, Tunnel};
 use anyhow::bail;
+use std::thread::sleep;
+use std::time::Duration;
 
 impl SshForwardArgument {
     fn ssh_arg(&self) -> String {
@@ -36,6 +38,16 @@ pub fn launch_tunnel(config: &Config, cli: &Tunnel) -> anyhow::Result<()> {
             .map(str::to_string)
             .collect(),
     );
+
+    if let Some(o) = profile.open.as_ref().map(String::to_string) {
+        std::thread::spawn(move || {
+            sleep(Duration::from_secs(1));
+            log::info!("Opening: {}", o);
+            if let Err(e) = open::that(&o) {
+                log::error!("Unable to open: {o}: {e}");
+            }
+        });
+    }
 
     invoke_ssh(ssh_args, cli.common.stdout)?;
     Ok(())
