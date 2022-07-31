@@ -99,6 +99,7 @@ pub struct SshJumpHost {
     pub port: Option<u16>,
 }
 
+#[derive(Default)]
 pub struct Config {
     pub rdp: Vec<RdpProfile>,
     pub ssh: Vec<SshProfile>,

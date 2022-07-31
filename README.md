@@ -16,3 +16,10 @@ From local source:
 ```
 cargo install --path . --debug
 ```
+
+## Completions
+
+```bash
+complete -C __remotec_shell_completion remotec
+complete -C __remotec_shell_completion remotec.exe
+```
