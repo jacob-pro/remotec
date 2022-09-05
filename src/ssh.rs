@@ -4,8 +4,13 @@ use crate::{Config, Ssh, SshCommon};
 use anyhow::{bail, Context};
 use std::process::Command;
 
-pub fn ssh_args(config: &Config, cli: &SshCommon, profile: &str) -> anyhow::Result<Vec<String>> {
-    let profile = select_profile_by_name("SSH", &config.ssh, profile)?;
+pub fn ssh_args(
+    config: &Config,
+    cli: &SshCommon,
+    profile: &str,
+    print_description: bool,
+) -> anyhow::Result<Vec<String>> {
+    let profile = select_profile_by_name("SSH", &config.ssh, profile, print_description)?;
     let jumps = jump_hosts(profile, cli)?;
     let address = profile.address.choose_address(cli.ipv4, cli.ipv6)?;
     let username = username(profile, config);
@@ -49,7 +54,7 @@ pub fn invoke_ssh(args: Vec<String>, stdout: bool) -> anyhow::Result<()> {
 }
 
 pub fn launch_ssh(config: &Config, cli: &Ssh) -> anyhow::Result<()> {
-    let args = ssh_args(config, &cli.common, &cli.name)?;
+    let args = ssh_args(config, &cli.common, &cli.name, true)?;
     invoke_ssh(args, cli.common.stdout)?;
     Ok(())
 }

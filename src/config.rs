@@ -68,6 +68,7 @@ pub struct RdpProfile {
     pub gateway_policy: GatewayPolicy,
     #[serde(default)]
     pub separate_credentials: bool,
+    pub description: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -80,6 +81,7 @@ pub struct SshProfile {
     pub disable_jump_hosts: bool,
     #[serde(default)]
     pub jump_hosts: Vec<SshJumpHost>,
+    pub description: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -88,6 +90,7 @@ pub struct TunnelProfile {
     pub ssh_profile: String,
     pub forwards: Vec<SshForwardArgument>,
     pub open: Option<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -109,6 +112,7 @@ pub struct CommandProfile {
     pub name: String,
     pub ssh_profile: String,
     pub command: Vec<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Default)]

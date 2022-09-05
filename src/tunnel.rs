@@ -16,11 +16,11 @@ impl SshForwardArgument {
 }
 
 pub fn launch_tunnel(config: &Config, cli: &Tunnel) -> anyhow::Result<()> {
-    let profile = select_profile_by_name("Tunnel", &config.tunnels, &cli.name)?;
+    let profile = select_profile_by_name("Tunnel", &config.tunnels, &cli.name, true)?;
     if profile.forwards.is_empty() {
         bail!("Profile doesn't contain any forwards");
     }
-    let mut ssh_args = ssh_args(config, &cli.common, &profile.ssh_profile)?;
+    let mut ssh_args = ssh_args(config, &cli.common, &profile.ssh_profile, false)?;
 
     for f in &profile.forwards {
         log::info!(

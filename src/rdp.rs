@@ -20,7 +20,7 @@ fn cache_directory() -> anyhow::Result<PathBuf> {
 }
 
 pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
-    let profile = select_profile_by_name("RDP", &config.rdp, &cli.name)?;
+    let profile = select_profile_by_name("RDP", &config.rdp, &cli.name, true)?;
 
     let mut rdp_config = Vec::new();
     let mut address_base = format!(

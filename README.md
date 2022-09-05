@@ -11,12 +11,6 @@ From latest git:
 cargo install --git https://github.com/jacob-pro/remotec
 ```
 
-From local source:
-
-```
-cargo install --path . --debug
-```
-
 ## Completions
 
 ```bash
