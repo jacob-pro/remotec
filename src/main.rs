@@ -1,10 +1,12 @@
 mod address;
+mod command;
 mod config;
 mod rdp;
 mod select;
 mod ssh;
 mod tunnel;
 
+use crate::command::launch_command;
 use crate::config::Config;
 use crate::rdp::launch_rdp;
 use crate::ssh::launch_ssh;
@@ -24,10 +26,12 @@ struct Cli {
 enum Subcommand {
     /// Launch an RDP connection
     Rdp(Rdp),
-    /// Launch an SSH connection
+    /// Launch an SSH session
     Ssh(Ssh),
     /// Open SSH tunnel(s)
     Tunnel(Tunnel),
+    /// Run a remote command using SSH
+    Command(Command),
     /// Open config file
     Config,
 }
@@ -91,6 +95,14 @@ pub struct Tunnel {
     common: SshCommon,
 }
 
+#[derive(Args)]
+pub struct Command {
+    /// Name of the command to run
+    name: String,
+    #[clap(flatten)]
+    common: SshCommon,
+}
+
 fn main() {
     let args = Cli::parse();
     env_logger::Builder::from_env(Env::default().default_filter_or("info"))
@@ -108,6 +120,7 @@ fn run(args: Cli) -> anyhow::Result<()> {
         Subcommand::Rdp(rdp) => launch_rdp(&config, &rdp),
         Subcommand::Ssh(ssh) => launch_ssh(&config, &ssh),
         Subcommand::Tunnel(tunnel) => launch_tunnel(&config, &tunnel),
+        Subcommand::Command(cmd) => launch_command(&config, &cmd),
         Subcommand::Config => {
             let cfg_path = config::config_path()?;
             open::that(&cfg_path).context("Unable to open config file")

@@ -59,9 +59,7 @@ pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
             Some(s) => s,
         };
 
-        let dest = cache_directory()?
-            .join(format!("remotec-{}", profile.name))
-            .with_extension("rdp");
+        let dest = cache_directory()?.join(&profile.name).with_extension("rdp");
         fs::write(&dest, &rdp_config).context("Unable to write RDP config")?;
 
         backend.open(&dest, cli.edit)?

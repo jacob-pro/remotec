@@ -1,4 +1,4 @@
-use crate::config::{RdpProfile, SshProfile, TunnelProfile};
+use crate::config::{CommandProfile, RdpProfile, SshProfile, TunnelProfile};
 use anyhow::Context;
 
 pub trait NamedProfile {
@@ -18,6 +18,12 @@ impl NamedProfile for SshProfile {
 }
 
 impl NamedProfile for TunnelProfile {
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl NamedProfile for CommandProfile {
     fn name(&self) -> &str {
         &self.name
     }
