@@ -85,7 +85,7 @@ fn main() {
         current_idx: 1,
     };
 
-    let subcommands = vec!["rdp", "ssh", "tunnel", "config"];
+    let subcommands = vec!["rdp", "ssh", "tunnel", "command", "config"];
     match ctx.next_arg() {
         None => {
             ctx.input.complete_subcommand(subcommands);
@@ -96,6 +96,7 @@ fn main() {
                     "rdp" => complete_rdp(ctx),
                     "ssh" => complete_ssh(ctx),
                     "tunnel" => complete_tunnel(ctx),
+                    "command" => complete_command(ctx),
                     _ => {}
                 }
             } else {
@@ -164,6 +165,33 @@ fn complete_tunnel(mut ctx: Context) {
     let possibilities = ctx
         .config
         .tunnels
+        .iter()
+        .map(|r| r.name.as_str())
+        .collect::<Vec<_>>();
+    match next {
+        None => {
+            ctx.input.complete_subcommand(possibilities);
+        }
+        Some(_arg) => {
+            if ctx.new_arg() {
+                let filtered = ctx.filter_existing_options(SSH_OPTIONS);
+                let options = filtered
+                    .iter()
+                    .flat_map(|c| c.suggestion())
+                    .collect::<Vec<_>>();
+                ctx.input.complete_subcommand(options);
+            } else {
+                ctx.input.complete_subcommand(possibilities);
+            }
+        }
+    }
+}
+
+fn complete_command(mut ctx: Context) {
+    let next = ctx.next_arg();
+    let possibilities = ctx
+        .config
+        .commands
         .iter()
         .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
