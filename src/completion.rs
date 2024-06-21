@@ -8,16 +8,15 @@ use num_integer::Integer;
 use shell_completion::{BashCompletionInput, CompletionInput};
 use std::collections::{HashSet, VecDeque};
 
-struct Context {
-    config: Config,
-    up_to_cursor_str: String,
+struct Context<'t> {
+    config: &'t Config,
+    up_to_cursor_str: &'t str,
     pending_args_up_to_cursor: VecDeque<String>,
     all_args: Vec<String>,
-    input: BashCompletionInput,
     current_idx: usize,
 }
 
-impl Context {
+impl Context<'_> {
     /// If there are more arguments to parse, or the user is about to start a new argument
     fn new_arg(&self) -> bool {
         self.up_to_cursor_str.ends_with(' ') || !self.pending_args_up_to_cursor.is_empty()
@@ -38,7 +37,7 @@ impl Context {
             .all_args
             .iter()
             .skip(self.current_idx)
-            .map(|s| s.as_str())
+            .map(ToString::to_string)
             .collect::<HashSet<_>>();
         options
             .iter()
@@ -65,31 +64,36 @@ fn balance_and_split(s: &str) -> Option<Vec<String>> {
 
 fn main() {
     let input = BashCompletionInput::from_args().expect("Missing expected environment variables");
+    let config = Config::load().unwrap_or_default();
+    let completions = get_completions(&config, &input.line, input.cursor_position);
+    input.complete_subcommand(completions.iter().map(|x| x.as_str()).collect::<Vec<_>>());
+}
 
-    let trim = input.line[0..input.cursor_position].to_string();
+fn get_completions(config: &Config, line: &str, cursor_position: usize) -> Vec<String> {
+    let trim = &line[0..cursor_position];
 
     let args_up_to_cursor = match balance_and_split(&trim) {
-        None => return,
+        None => return Vec::new(),
         Some(s) => s,
     };
-    let all_args = match balance_and_split(&input.line) {
-        None => return,
+    let all_args = match balance_and_split(line) {
+        None => return Vec::new(),
         Some(s) => s,
     };
     let mut ctx = Context {
-        config: Config::load().unwrap_or_default(),
+        config,
         up_to_cursor_str: trim,
         pending_args_up_to_cursor: args_up_to_cursor.into_iter().skip(1).collect(),
         all_args,
-        input,
         current_idx: 1,
     };
 
-    let subcommands = vec!["rdp", "ssh", "tunnel", "command", "config"];
+    let subcommands = vec!["rdp", "ssh", "tunnel", "command", "config"]
+        .into_iter()
+        .map(ToString::to_string)
+        .collect();
     match ctx.next_arg() {
-        None => {
-            ctx.input.complete_subcommand(subcommands);
-        }
+        None => subcommands,
         Some(arg) => {
             if ctx.new_arg() {
                 match arg.as_str() {
@@ -97,27 +101,25 @@ fn main() {
                     "ssh" => complete_ssh(ctx),
                     "tunnel" => complete_tunnel(ctx),
                     "command" => complete_command(ctx),
-                    _ => {}
+                    _ => vec![],
                 }
             } else {
-                ctx.input.complete_subcommand(subcommands);
+                subcommands
             }
         }
     }
 }
 
-fn complete_rdp(mut ctx: Context) {
+fn complete_rdp(mut ctx: Context) -> Vec<String> {
     let next = ctx.next_arg();
     let possibilities = ctx
         .config
         .rdp
         .iter()
-        .map(|r| r.name.as_str())
+        .map(|r| r.name.to_owned())
         .collect::<Vec<_>>();
     match next {
-        None => {
-            ctx.input.complete_subcommand(possibilities);
-        }
+        None => possibilities,
         Some(_arg) => {
             if ctx.new_arg() {
                 let filtered = ctx.filter_existing_options(RDP_OPTIONS);
@@ -125,26 +127,24 @@ fn complete_rdp(mut ctx: Context) {
                     .iter()
                     .flat_map(|c| c.suggestion())
                     .collect::<Vec<_>>();
-                ctx.input.complete_subcommand(options);
+                options
             } else {
-                ctx.input.complete_subcommand(possibilities);
+                possibilities
             }
         }
     }
 }
 
-fn complete_ssh(mut ctx: Context) {
+fn complete_ssh(mut ctx: Context) -> Vec<String> {
     let next = ctx.next_arg();
     let possibilities = ctx
         .config
         .ssh
         .iter()
-        .map(|r| r.name.as_str())
+        .map(|r| r.name.to_owned())
         .collect::<Vec<_>>();
     match next {
-        None => {
-            ctx.input.complete_subcommand(possibilities);
-        }
+        None => possibilities,
         Some(_arg) => {
             if ctx.new_arg() {
                 let filtered = ctx.filter_existing_options(SSH_OPTIONS);
@@ -152,26 +152,24 @@ fn complete_ssh(mut ctx: Context) {
                     .iter()
                     .flat_map(|c| c.suggestion())
                     .collect::<Vec<_>>();
-                ctx.input.complete_subcommand(options);
+                options
             } else {
-                ctx.input.complete_subcommand(possibilities);
+                possibilities
             }
         }
     }
 }
 
-fn complete_tunnel(mut ctx: Context) {
+fn complete_tunnel(mut ctx: Context) -> Vec<String> {
     let next = ctx.next_arg();
     let possibilities = ctx
         .config
         .tunnels
         .iter()
-        .map(|r| r.name.as_str())
+        .map(|r| r.name.to_owned())
         .collect::<Vec<_>>();
     match next {
-        None => {
-            ctx.input.complete_subcommand(possibilities);
-        }
+        None => possibilities,
         Some(_arg) => {
             if ctx.new_arg() {
                 let filtered = ctx.filter_existing_options(SSH_OPTIONS);
@@ -179,26 +177,24 @@ fn complete_tunnel(mut ctx: Context) {
                     .iter()
                     .flat_map(|c| c.suggestion())
                     .collect::<Vec<_>>();
-                ctx.input.complete_subcommand(options);
+                options
             } else {
-                ctx.input.complete_subcommand(possibilities);
+                possibilities
             }
         }
     }
 }
 
-fn complete_command(mut ctx: Context) {
+fn complete_command(mut ctx: Context) -> Vec<String> {
     let next = ctx.next_arg();
     let possibilities = ctx
         .config
         .commands
         .iter()
-        .map(|r| r.name.as_str())
+        .map(|r| r.name.to_owned())
         .collect::<Vec<_>>();
     match next {
-        None => {
-            ctx.input.complete_subcommand(possibilities);
-        }
+        None => possibilities,
         Some(_arg) => {
             if ctx.new_arg() {
                 let filtered = ctx.filter_existing_options(SSH_OPTIONS);
@@ -206,9 +202,9 @@ fn complete_command(mut ctx: Context) {
                     .iter()
                     .flat_map(|c| c.suggestion())
                     .collect::<Vec<_>>();
-                ctx.input.complete_subcommand(options);
+                options
             } else {
-                ctx.input.complete_subcommand(possibilities);
+                possibilities
             }
         }
     }
@@ -224,12 +220,20 @@ impl CliOption {
         Self { short, long }
     }
 
-    fn strings(&self) -> HashSet<&'static str> {
-        self.long.iter().chain(self.short.iter()).copied().collect()
+    fn strings(&self) -> HashSet<String> {
+        self.long
+            .iter()
+            .chain(self.short.iter())
+            .map(ToString::to_string)
+            .collect()
     }
 
-    fn suggestion(&self) -> Option<&'static str> {
-        self.long.iter().chain(self.short.iter()).copied().next()
+    fn suggestion(&self) -> Option<String> {
+        self.long
+            .iter()
+            .chain(self.short.iter())
+            .map(ToString::to_string)
+            .next()
     }
 }
 
@@ -244,10 +248,44 @@ const RDP_OPTIONS: &[CliOption] = &[
 ];
 
 const SSH_OPTIONS: &[CliOption] = &[
-    CliOption::new(Some("-d"), Some("--disable-jumphosts")),
+    CliOption::new(Some("-d"), Some("--disable-jump-hosts")),
     CliOption::new(None, Some("--help")),
     CliOption::new(None, Some("--ipv4")),
     CliOption::new(None, Some("--ipv6")),
     CliOption::new(Some("-j"), Some("--use-jump-hosts")),
     CliOption::new(None, Some("--stdout")),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn owned(input: Vec<&'static str>) -> Vec<String> {
+        input.into_iter().map(|x| x.to_owned()).collect()
+    }
+
+    fn get_completions_from_end(config: &Config, line: &str) -> Vec<String> {
+        get_completions(config, line, line.len() - 1)
+    }
+
+    #[test]
+    fn test() {
+        let config = Config::default();
+        assert_eq!(
+            get_completions_from_end(&config, "remotec"),
+            owned(vec!["rdp", "ssh", "tunnel", "command", "config"])
+        );
+        assert_eq!(
+            get_completions_from_end(&config, "remotec "),
+            owned(vec!["rdp", "ssh", "tunnel", "command", "config"])
+        );
+        assert_eq!(
+            get_completions_from_end(&config, "remotec r"),
+            owned(vec!["rdp", "ssh", "tunnel", "command", "config"])
+        );
+        assert_eq!(
+            get_completions_from_end(&config, "remotec unknown"),
+            owned(vec!["rdp", "ssh", "tunnel", "command", "config"])
+        );
+    }
+}

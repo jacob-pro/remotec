@@ -45,7 +45,7 @@ pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
     rdp_config.push("gatewayprofileusagemethod:i:1".to_string());
     rdp_config.push(format!(
         "promptcredentialonce:i:{}",
-        profile.separate_credentials.then_some(0).unwrap_or(1)
+        if profile.separate_credentials { 0 } else { 1 }
     ));
     rdp_config.push("".to_string());
 
@@ -110,7 +110,7 @@ impl RdpBackend {
                 if edit {
                     cmd.arg("/edit");
                 }
-                cmd.arg(&rdp_file);
+                cmd.arg(rdp_file);
                 cmd.spawn()
                     .context("Unable to launch Microsoft Remote Desktop")?;
             }

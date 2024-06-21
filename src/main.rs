@@ -123,7 +123,7 @@ fn run(args: Cli) -> anyhow::Result<()> {
         Subcommand::Command(cmd) => launch_command(&config, &cmd),
         Subcommand::Config => {
             let cfg_path = config::config_path()?;
-            open::that(&cfg_path).context("Unable to open config file")
+            open::that(cfg_path).context("Unable to open config file")
         }
     }?;
     Ok(())
