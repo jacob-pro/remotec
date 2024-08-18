@@ -1,0 +1,43 @@
+{
+  "rdp": [
+    {
+      "name": "rdp_example",
+      "hostname": "rdp.example.com",
+      "username": "administrator"
+    }
+  ],
+  "ssh": [
+    {
+      "name": "ssh_example",
+      "description": "Connect to SSH server",
+      "ipv4": "192.168.1.1",
+      "username": "root"
+    }
+  ],
+  "tunnels": [
+    {
+      "name": "tunnel_example",
+      "description": "Tunnel to remote web server",
+      "ssh_profile": "ssh_example",
+      "forwards": [
+        {
+          "local_port": 8026,
+          "remote_port": 80,
+          "remote_host": "127.0.0.1"
+        }
+      ],
+      "open": "http://localhost:8026"
+    }
+  ],
+  "commands": [
+    {
+      "name": "command_example",
+      "description": "Send WOL via SSH host",
+      "ssh_profile": "ssh_example",
+      "command": [
+        "etherwake",
+        "00-1B-63-84-45-E6"
+      ]
+    }
+  ]
+}

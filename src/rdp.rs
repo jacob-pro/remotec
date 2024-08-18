@@ -1,9 +1,9 @@
 // See: https://docs.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/rdp-files
 
-use crate::config::{GatewayPolicy, RdpBackend, RdpProfile};
 use crate::select::select_profile_by_name;
 use crate::{Config, Rdp};
 use anyhow::{bail, Context};
+use remotec::config::{GatewayPolicy, RdpBackend, RdpProfile};
 use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -45,7 +45,7 @@ pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
     rdp_config.push("gatewayprofileusagemethod:i:1".to_string());
     rdp_config.push(format!(
         "promptcredentialonce:i:{}",
-        profile.separate_credentials.then_some(0).unwrap_or(1)
+        if profile.separate_credentials { 0 } else { 1 }
     ));
     rdp_config.push("".to_string());
 
@@ -55,14 +55,14 @@ pub fn launch_rdp(config: &Config, cli: &Rdp) -> anyhow::Result<()> {
         print!("{}", rdp_config);
     } else {
         let backend = match config.rdp_defaults.backend {
-            None => RdpBackend::default_for_platform()?,
+            None => default_for_platform()?,
             Some(s) => s,
         };
 
         let dest = cache_directory()?.join(&profile.name).with_extension("rdp");
         fs::write(&dest, &rdp_config).context("Unable to write RDP config")?;
 
-        backend.open(&dest, cli.edit)?
+        open(&backend, &dest, cli.edit)?
     }
 
     Ok(())
@@ -91,32 +91,30 @@ fn username(profile: &RdpProfile, config: &Config) -> String {
     whoami::username()
 }
 
-impl RdpBackend {
-    fn default_for_platform() -> anyhow::Result<Self> {
-        cfg_if::cfg_if! {
-            if #[cfg(windows)] {
-                Ok(RdpBackend::Mstsc)
-            } else {
-                bail!("No RDP backend supported for this platform")
-            }
+fn default_for_platform() -> anyhow::Result<RdpBackend> {
+    cfg_if::cfg_if! {
+        if #[cfg(windows)] {
+            Ok(RdpBackend::Mstsc)
+        } else {
+            bail!("No RDP backend supported for this platform")
         }
     }
+}
 
-    fn open(&self, rdp_file: &Path, edit: bool) -> anyhow::Result<()> {
-        match &self {
-            #[cfg(windows)]
-            RdpBackend::Mstsc => {
-                let mut cmd = Command::new("mstsc");
-                if edit {
-                    cmd.arg("/edit");
-                }
-                cmd.arg(&rdp_file);
-                cmd.spawn()
-                    .context("Unable to launch Microsoft Remote Desktop")?;
+fn open(rdp_backend: &RdpBackend, rdp_file: &Path, edit: bool) -> anyhow::Result<()> {
+    match rdp_backend {
+        #[cfg(windows)]
+        RdpBackend::Mstsc => {
+            let mut cmd = Command::new("mstsc");
+            if edit {
+                cmd.arg("/edit");
             }
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!(),
+            cmd.arg(rdp_file);
+            cmd.spawn()
+                .context("Unable to launch Microsoft Remote Desktop")?;
         }
-        Ok(())
+        #[allow(unreachable_patterns)]
+        _ => unimplemented!(),
     }
+    Ok(())
 }

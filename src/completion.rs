@@ -1,217 +1,141 @@
-// inspired by: https://www.joshmcguigan.com/blog/shell-completions-pure-rust/
-// this is my first ever attempt at a completion script - it's probably not very good!
+use remotec::config::Config;
+use shell_completion::{BashCompletionInput, CompletionInput, CompletionSet};
+use std::collections::HashSet;
 
-mod config;
-
-use crate::config::Config;
-use num_integer::Integer;
-use shell_completion::{BashCompletionInput, CompletionInput};
-use std::collections::{HashSet, VecDeque};
-
-struct Context {
-    config: Config,
-    up_to_cursor_str: String,
-    pending_args_up_to_cursor: VecDeque<String>,
-    all_args: Vec<String>,
-    input: BashCompletionInput,
+struct Context<'t> {
+    config: &'t Config,
+    input: &'t BashCompletionInput,
     current_idx: usize,
 }
 
-impl Context {
-    /// If there are more arguments to parse, or the user is about to start a new argument
-    fn new_arg(&self) -> bool {
-        self.up_to_cursor_str.ends_with(' ') || !self.pending_args_up_to_cursor.is_empty()
+impl Context<'_> {
+    /// Gets the next argument to process
+    /// boolean indicates if it is the current argument under the cursor
+    fn next_arg(&mut self) -> Option<(&str, bool)> {
+        let binding = self.input.args();
+        let arg = binding.get(self.current_idx);
+        let is_current = self.current_idx == self.input.arg_index();
+        self.current_idx += 1;
+        arg.map(|x| (*x, is_current))
     }
 
-    /// Gets the next argument to parse
-    fn next_arg(&mut self) -> Option<String> {
-        let arg = self.pending_args_up_to_cursor.pop_front();
-        if arg.is_some() {
-            self.current_idx += 1;
-        }
-        arg
-    }
-
-    /// Filters out options which have already been specified
+    /// Filters out options which have already been specified in the command line
     fn filter_existing_options(&self, options: &'static [CliOption]) -> Vec<&'static CliOption> {
-        let unparsed_args = self
-            .all_args
+        let mut args = self
+            .input
+            .args()
             .iter()
-            .skip(self.current_idx)
-            .map(|s| s.as_str())
+            .skip(1)
+            .copied()
             .collect::<HashSet<_>>();
+        // Remove the current word under the cursor
+        args.remove(self.input.args()[self.input.arg_index()]);
+        // Replace with the right-hand side of the word under the cursor
+        args.insert(
+            self.input.args()[self.input.arg_index()]
+                .split_at(self.input.char_index())
+                .1,
+        );
         options
             .iter()
-            .filter(|o| {
-                let repr = o.strings();
-                unparsed_args.intersection(&repr).count() == 0
-            })
+            .filter(|o| args.intersection(&o.representations()).count() == 0)
             .collect()
     }
 }
 
-fn balance_and_split(s: &str) -> Option<Vec<String>> {
-    let mut s = s.to_string();
-    // Split can fail when input contains unmatched quote
-    // If the user is part way through a quote lets assume it to be one word
-    if s.matches('\'').count().is_odd() {
-        s.push('\'');
-    }
-    if s.matches('\"').count().is_odd() {
-        s.push('\"');
-    }
-    shell_words::split(&s).ok()
-}
-
 fn main() {
-    let input = BashCompletionInput::from_args().expect("Missing expected environment variables");
-
-    let trim = input.line[0..input.cursor_position].to_string();
-
-    let args_up_to_cursor = match balance_and_split(&trim) {
-        None => return,
-        Some(s) => s,
-    };
-    let all_args = match balance_and_split(&input.line) {
-        None => return,
-        Some(s) => s,
-    };
-    let mut ctx = Context {
-        config: Config::load().unwrap_or_default(),
-        up_to_cursor_str: trim,
-        pending_args_up_to_cursor: args_up_to_cursor.into_iter().skip(1).collect(),
-        all_args,
-        input,
-        current_idx: 1,
-    };
-
-    let subcommands = vec!["rdp", "ssh", "tunnel", "command", "config"];
-    match ctx.next_arg() {
-        None => {
-            ctx.input.complete_subcommand(subcommands);
-        }
-        Some(arg) => {
-            if ctx.new_arg() {
-                match arg.as_str() {
-                    "rdp" => complete_rdp(ctx),
-                    "ssh" => complete_ssh(ctx),
-                    "tunnel" => complete_tunnel(ctx),
-                    "command" => complete_command(ctx),
-                    _ => {}
-                }
-            } else {
-                ctx.input.complete_subcommand(subcommands);
-            }
-        }
+    if let Ok(input) = BashCompletionInput::from_env() {
+        let config = Config::load().unwrap_or_default();
+        let completions = get_completions(&config, &input);
+        completions.suggest();
     }
 }
 
-fn complete_rdp(mut ctx: Context) {
-    let next = ctx.next_arg();
+fn get_completions(config: &Config, input: &BashCompletionInput) -> Vec<String> {
+    let mut ctx = Context {
+        config,
+        input,
+        current_idx: 0,
+    };
+
+    // Skip the program name
+    ctx.next_arg().unwrap();
+
+    // Get the subcommand
+    let (subcommand, is_current_arg) = ctx.next_arg().unwrap();
+    log::info!("Subcommand: {}", subcommand);
+
+    let completions = if is_current_arg {
+        vec!["rdp", "ssh", "tunnel", "command", "config", "list"]
+    } else {
+        match subcommand {
+            "rdp" => complete_rdp(&mut ctx),
+            "ssh" => complete_ssh(&mut ctx),
+            "tunnel" => complete_tunnel(&mut ctx),
+            "command" => complete_command(&mut ctx),
+            // Unsupported subcommand
+            _ => vec![],
+        }
+    };
+
+    // Filter matching subcommands
+    input.complete_subcommand(completions)
+}
+
+fn complete_connection<'t>(
+    ctx: &'t mut Context,
+    connection_names: Vec<&'t str>,
+    options: &'static [CliOption],
+) -> Vec<&'t str> {
+    let (connection_name, is_current_arg) = ctx.next_arg().unwrap();
+    log::info!("Connection name: {:?}", connection_name);
+    if is_current_arg {
+        connection_names
+    } else {
+        let filtered = ctx.filter_existing_options(options);
+        let options = filtered.iter().map(|c| c.suggestion()).collect::<Vec<_>>();
+        options
+    }
+}
+
+fn complete_rdp<'t>(ctx: &'t mut Context) -> Vec<&'t str> {
     let possibilities = ctx
         .config
         .rdp
         .iter()
         .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
-    match next {
-        None => {
-            ctx.input.complete_subcommand(possibilities);
-        }
-        Some(_arg) => {
-            if ctx.new_arg() {
-                let filtered = ctx.filter_existing_options(RDP_OPTIONS);
-                let options = filtered
-                    .iter()
-                    .flat_map(|c| c.suggestion())
-                    .collect::<Vec<_>>();
-                ctx.input.complete_subcommand(options);
-            } else {
-                ctx.input.complete_subcommand(possibilities);
-            }
-        }
-    }
+    complete_connection(ctx, possibilities, RDP_OPTIONS)
 }
 
-fn complete_ssh(mut ctx: Context) {
-    let next = ctx.next_arg();
+fn complete_ssh<'t>(ctx: &'t mut Context) -> Vec<&'t str> {
     let possibilities = ctx
         .config
         .ssh
         .iter()
         .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
-    match next {
-        None => {
-            ctx.input.complete_subcommand(possibilities);
-        }
-        Some(_arg) => {
-            if ctx.new_arg() {
-                let filtered = ctx.filter_existing_options(SSH_OPTIONS);
-                let options = filtered
-                    .iter()
-                    .flat_map(|c| c.suggestion())
-                    .collect::<Vec<_>>();
-                ctx.input.complete_subcommand(options);
-            } else {
-                ctx.input.complete_subcommand(possibilities);
-            }
-        }
-    }
+    complete_connection(ctx, possibilities, SSH_OPTIONS)
 }
 
-fn complete_tunnel(mut ctx: Context) {
-    let next = ctx.next_arg();
+fn complete_tunnel<'t>(ctx: &'t mut Context) -> Vec<&'t str> {
     let possibilities = ctx
         .config
         .tunnels
         .iter()
         .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
-    match next {
-        None => {
-            ctx.input.complete_subcommand(possibilities);
-        }
-        Some(_arg) => {
-            if ctx.new_arg() {
-                let filtered = ctx.filter_existing_options(SSH_OPTIONS);
-                let options = filtered
-                    .iter()
-                    .flat_map(|c| c.suggestion())
-                    .collect::<Vec<_>>();
-                ctx.input.complete_subcommand(options);
-            } else {
-                ctx.input.complete_subcommand(possibilities);
-            }
-        }
-    }
+    complete_connection(ctx, possibilities, SSH_OPTIONS)
 }
 
-fn complete_command(mut ctx: Context) {
-    let next = ctx.next_arg();
+fn complete_command<'t>(ctx: &'t mut Context) -> Vec<&'t str> {
     let possibilities = ctx
         .config
         .commands
         .iter()
         .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
-    match next {
-        None => {
-            ctx.input.complete_subcommand(possibilities);
-        }
-        Some(_arg) => {
-            if ctx.new_arg() {
-                let filtered = ctx.filter_existing_options(SSH_OPTIONS);
-                let options = filtered
-                    .iter()
-                    .flat_map(|c| c.suggestion())
-                    .collect::<Vec<_>>();
-                ctx.input.complete_subcommand(options);
-            } else {
-                ctx.input.complete_subcommand(possibilities);
-            }
-        }
-    }
+    complete_connection(ctx, possibilities, SSH_OPTIONS)
 }
 
 struct CliOption {
@@ -224,12 +148,18 @@ impl CliOption {
         Self { short, long }
     }
 
-    fn strings(&self) -> HashSet<&'static str> {
+    /// All possible representation of the option
+    fn representations(&self) -> HashSet<&'static str> {
         self.long.iter().chain(self.short.iter()).copied().collect()
     }
 
-    fn suggestion(&self) -> Option<&'static str> {
-        self.long.iter().chain(self.short.iter()).copied().next()
+    /// Suggest long if possible otherwise short
+    fn suggestion(&self) -> &'static str {
+        self.long
+            .iter()
+            .chain(self.short.iter())
+            .next()
+            .expect("Option should have either long or short")
     }
 }
 
@@ -244,10 +174,89 @@ const RDP_OPTIONS: &[CliOption] = &[
 ];
 
 const SSH_OPTIONS: &[CliOption] = &[
-    CliOption::new(Some("-d"), Some("--disable-jumphosts")),
+    CliOption::new(Some("-d"), Some("--disable-jump-hosts")),
     CliOption::new(None, Some("--help")),
     CliOption::new(None, Some("--ipv4")),
     CliOption::new(None, Some("--ipv6")),
     CliOption::new(Some("-j"), Some("--use-jump-hosts")),
     CliOption::new(None, Some("--stdout")),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use env_logger::{Env, Target};
+
+    #[derive(Debug)]
+    struct TestCase<'t> {
+        input: &'t str,
+        output: &'t [&'t str],
+    }
+
+    impl<'t> TestCase<'_> {
+        fn new(input: &'t str, output: &'t [&'t str]) -> TestCase<'t> {
+            TestCase { input, output }
+        }
+    }
+
+    #[test]
+    fn test() {
+        env_logger::Builder::from_env(Env::default().default_filter_or("info"))
+            .target(Target::Stderr)
+            .init();
+
+        let test_profile = include_bytes!("../test_resources/test_profile.json");
+        let config = Config::from_bytes(test_profile).unwrap();
+
+        let cases = &[
+            // Subcommands
+            TestCase::new("remotec |", &["rdp", "ssh", "tunnel", "command", "config", "list"]),
+            TestCase::new(
+                "remotec |rdp",
+                &["rdp", "ssh", "tunnel", "command", "config", "list"],
+            ),
+            TestCase::new("remotec co|", &["command", "config"]),
+            TestCase::new("remotec co| --after", &["command", "config"]),
+            TestCase::new("remotec unknown|", &[]),
+            // Rdp
+            TestCase::new("remotec rdp |", &["rdp_example"]),
+            TestCase::new("remotec rdp rdp_ex|", &["rdp_example"]),
+            TestCase::new("remotec rdp abc|", &[]),
+            TestCase::new("remotec rdp rdp_example |", &["--disable-gateway", "edit", "--enable-gateway", "--help", "--ipv4", "--ipv6", "--stdout"]),
+            TestCase::new("remotec rdp rdp_example |--ipv4", &["--disable-gateway", "edit", "--enable-gateway", "--help", "--ipv6", "--stdout"]),
+            TestCase::new("remotec rdp rdp_example |--disable-gateway edit --enable-gateway --help --ipv4 --ipv6 --stdout", &[]),
+            TestCase::new("remotec rdp rdp_example |-d edit -g --help --ipv4 --ipv6 --stdout", &[]),
+            TestCase::new("remotec rdp rdp_example --ipv4 --disable|-gateway edit -g --help --ipv6 --stdout", &["--disable-gateway"]),
+
+            // SSH
+            TestCase::new("remotec ssh |", &["ssh_example"]),
+            TestCase::new("remotec ssh ssh_ex|", &["ssh_example"]),
+            TestCase::new("remotec ssh ssh_example --ipv4|", &["--ipv4"]),
+            TestCase::new("remotec ssh ssh_example --ipv4 |", &["--disable-jump-hosts", "--help", "--ipv6", "--use-jump-hosts", "--stdout"]),
+            // Tunnel
+            TestCase::new("remotec tunnel |", &["tunnel_example"]),
+            TestCase::new("remotec tunnel tunnel_ex|", &["tunnel_example"]),
+            // Command
+            TestCase::new("remotec command |", &["command_example"]),
+            TestCase::new("remotec command comma|", &["command_example"]),
+            TestCase::new("remotec command 'comma|", &["command_example"]),
+        ];
+
+        for (idx, case) in cases.iter().enumerate() {
+            log::info!("Beginning test case {}: \"{}\"", idx, case.input);
+            let comp_point = case.input.find('|').unwrap();
+            let line = case.input.replace('|', "");
+            let input = BashCompletionInput::new(&line, comp_point).unwrap();
+            log::info!(
+                "BashCompletionInput{{args: {:?}, arg_index: {}, char_index: {}}}",
+                input.args(),
+                input.arg_index(),
+                input.char_index()
+            );
+
+            let completions = get_completions(&config, &input);
+            assert_eq!(case.output, completions, "expected = left, actual = right");
+            log::info!("Finished test case with suggestions: {:?}\n", completions);
+        }
+    }
+}

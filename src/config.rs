@@ -13,8 +13,6 @@ struct ConfigFile {
     rdp_defaults: RdpDefaults,
     #[serde(default)]
     ssh_defaults: SshDefaults,
-    #[serde(default)]
-    commands: Vec<CommandProfile>,
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -29,26 +27,26 @@ struct SatelliteConfig {
     commands: Vec<CommandProfile>,
 }
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct RdpDefaults {
     pub username: Option<String>,
     pub backend: Option<RdpBackend>,
 }
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct SshDefaults {
     pub username: Option<String>,
 }
 
-/// At present we only support launching the Microsoft Windows Remote Desktop client (mstsc.exe)
+/// At present, we only support launching the Microsoft Windows Remote Desktop client (mstsc.exe)
 /// But in future we could support Linux clients etc.
-#[derive(Deserialize, Serialize, Copy, Clone)]
+#[derive(Debug, Deserialize, Serialize, Copy, Clone)]
 pub enum RdpBackend {
     #[cfg(windows)]
     Mstsc,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Address {
     pub hostname: Option<String>,
     pub ipv4: Option<String>,
@@ -56,7 +54,30 @@ pub struct Address {
     pub port: Option<u16>,
 }
 
-#[derive(Deserialize, Serialize)]
+impl Address {
+    pub fn choose_address(&self, force_ipv4: bool, force_ipv6: bool) -> anyhow::Result<&str> {
+        if force_ipv4 {
+            return self
+                .ipv4
+                .as_deref()
+                .context("An IPv4 address is not configured for this profile");
+        }
+        if force_ipv6 {
+            return self
+                .ipv6
+                .as_deref()
+                .context("An IPv6 address is not configured for this profile");
+        }
+        [&self.hostname, &self.ipv6, &self.ipv4]
+            .into_iter()
+            .flat_map(|x| x.iter())
+            .next()
+            .map(|x| x.as_str())
+            .context("No addresses configured for this profile")
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RdpProfile {
     pub name: String,
     #[serde(flatten)]
@@ -71,7 +92,7 @@ pub struct RdpProfile {
     pub description: Option<String>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SshProfile {
     pub name: String,
     #[serde(flatten)]
@@ -84,7 +105,7 @@ pub struct SshProfile {
     pub description: Option<String>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TunnelProfile {
     pub name: String,
     pub ssh_profile: String,
@@ -93,21 +114,21 @@ pub struct TunnelProfile {
     pub description: Option<String>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SshForwardArgument {
     pub local_port: u16,
     pub remote_port: u16,
     pub remote_host: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SshJumpHost {
     pub username: Option<String>,
     pub hostname: String,
     pub port: Option<u16>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CommandProfile {
     pub name: String,
     pub ssh_profile: String,
@@ -115,7 +136,7 @@ pub struct CommandProfile {
     pub description: Option<String>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Config {
     pub rdp: Vec<RdpProfile>,
     pub ssh: Vec<SshProfile>,
@@ -133,6 +154,28 @@ pub fn config_path() -> anyhow::Result<PathBuf> {
 }
 
 impl Config {
+    pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        let cfg_file: ConfigFile =
+            serde_json::from_slice(bytes).context("Unable to deserialize config file")?;
+        let mut config = Config {
+            rdp: cfg_file.this.rdp,
+            ssh: cfg_file.this.ssh,
+            tunnels: cfg_file.this.tunnels,
+            commands: cfg_file.this.commands,
+            rdp_defaults: cfg_file.rdp_defaults,
+            ssh_defaults: cfg_file.ssh_defaults,
+        };
+        for s in cfg_file.include {
+            if let Some(mut s) = load_satellite_config(&s) {
+                config.rdp.append(&mut s.rdp);
+                config.ssh.append(&mut s.ssh);
+                config.tunnels.append(&mut s.tunnels);
+                config.commands.append(&mut s.commands);
+            }
+        }
+        Ok(config)
+    }
+
     pub fn load() -> anyhow::Result<Self> {
         let config_path = config_path()?;
         if !config_path.exists() {
@@ -152,25 +195,7 @@ impl Config {
             bail!("Try again after saving your config changes")
         }
         let cfg_file = fs::read_to_string(&config_path).context("Unable to read config file")?;
-        let cfg_file: ConfigFile =
-            serde_json::from_str(&cfg_file).context("Unable to deserialize config file")?;
-        let mut config = Config {
-            rdp: cfg_file.this.rdp,
-            ssh: cfg_file.this.ssh,
-            tunnels: cfg_file.this.tunnels,
-            commands: cfg_file.this.commands,
-            rdp_defaults: cfg_file.rdp_defaults,
-            ssh_defaults: cfg_file.ssh_defaults,
-        };
-        for s in cfg_file.include {
-            if let Some(mut s) = load_satellite_config(&s) {
-                config.rdp.append(&mut s.rdp);
-                config.ssh.append(&mut s.ssh);
-                config.tunnels.append(&mut s.tunnels);
-                config.commands.append(&mut s.commands);
-            }
-        }
-        Ok(config)
+        Self::from_bytes(cfg_file.as_bytes())
     }
 }
 
@@ -196,7 +221,7 @@ fn load_satellite_config(path: &Path) -> Option<SatelliteConfig> {
     Some(config)
 }
 
-#[derive(Deserialize, Serialize, Copy, Clone)]
+#[derive(Debug, Deserialize, Serialize, Copy, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GatewayPolicy {
     Disable = 0,
