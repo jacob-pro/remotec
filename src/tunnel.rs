@@ -1,19 +1,9 @@
-use crate::config::SshForwardArgument;
 use crate::select::select_profile_by_name;
 use crate::ssh::{invoke_ssh, ssh_args};
 use crate::{Config, Tunnel};
 use anyhow::bail;
 use std::thread::sleep;
 use std::time::Duration;
-
-impl SshForwardArgument {
-    fn ssh_arg(&self) -> String {
-        format!(
-            "{}:{}:{}",
-            self.local_port, self.remote_host, self.remote_port
-        )
-    }
-}
 
 pub fn launch_tunnel(config: &Config, cli: &Tunnel) -> anyhow::Result<()> {
     let profile = select_profile_by_name("Tunnel", &config.tunnels, &cli.name, true)?;
@@ -30,7 +20,10 @@ pub fn launch_tunnel(config: &Config, cli: &Tunnel) -> anyhow::Result<()> {
             f.local_port
         );
         ssh_args.push("-L".to_string());
-        ssh_args.push(f.ssh_arg());
+        ssh_args.push(format!(
+            "{}:{}:{}",
+            f.local_port, f.remote_host, f.remote_port
+        ));
     }
     ssh_args.append(
         &mut ["sleep", "2147483647"]

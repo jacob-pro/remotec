@@ -1,7 +1,7 @@
-use crate::config::{SshJumpHost, SshProfile};
 use crate::select::select_profile_by_name;
 use crate::{Config, Ssh, SshCommon};
 use anyhow::{bail, Context};
+use remotec::config::{SshJumpHost, SshProfile};
 use std::process::Command;
 
 pub fn ssh_args(
@@ -79,7 +79,7 @@ fn username(profile: &SshProfile, config: &Config) -> String {
     if let Some(username) = &profile.username {
         return username.to_string();
     }
-    if let Some(username) = &config.rdp_defaults.username {
+    if let Some(username) = &config.ssh_defaults.username {
         return username.to_string();
     }
     whoami::username()

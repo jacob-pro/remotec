@@ -1,5 +1,5 @@
-use crate::config::{CommandProfile, RdpProfile, SshProfile, TunnelProfile};
 use anyhow::Context;
+use remotec::config::{CommandProfile, RdpProfile, SshProfile, TunnelProfile};
 
 pub trait NamedProfile {
     fn name(&self) -> &str;

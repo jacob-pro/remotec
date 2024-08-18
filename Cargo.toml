@@ -7,8 +7,6 @@ authors = ["Jacob Halsey <jacob@jhalsey.com>"]
 license = "GPL-3.0"
 repository = "https://github.com/jacob-pro/remotec"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.58"
 cfg-if = "1.0.0"

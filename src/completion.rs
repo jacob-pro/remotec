@@ -1,9 +1,4 @@
-// inspired by: https://www.joshmcguigan.com/blog/shell-completions-pure-rust/
-// this is my first ever attempt at a completion script - it's probably not very good!
-
-mod config;
-
-use crate::config::Config;
+use remotec::config::Config;
 use shell_completion::{BashCompletionInput, CompletionInput, CompletionSet};
 use std::collections::HashSet;
 
@@ -31,7 +26,7 @@ impl Context<'_> {
             .args()
             .iter()
             .skip(1)
-            .map(|x| *x)
+            .copied()
             .collect::<HashSet<_>>();
         // Remove the current word under the cursor
         args.remove(self.input.args()[self.input.arg_index()]);
@@ -63,42 +58,37 @@ fn get_completions(config: &Config, input: &BashCompletionInput) -> Vec<String> 
         current_idx: 0,
     };
 
-    let subcommands = vec!["rdp", "ssh", "tunnel", "command", "config"]
-        .into_iter()
-        .map(ToString::to_string)
-        .collect();
-
     // Skip the program name
-    ctx.next_arg();
+    ctx.next_arg().unwrap();
 
     // Get the subcommand
     let (subcommand, is_current_arg) = ctx.next_arg().unwrap();
     log::info!("Subcommand: {}", subcommand);
+
     let completions = if is_current_arg {
-        subcommands
+        vec!["rdp", "ssh", "tunnel", "command", "config"]
     } else {
         match subcommand {
-            "rdp" => complete_rdp(ctx),
-            "ssh" => complete_ssh(ctx),
-            "tunnel" => complete_tunnel(ctx),
-            "command" => complete_command(ctx),
+            "rdp" => complete_rdp(&mut ctx),
+            "ssh" => complete_ssh(&mut ctx),
+            "tunnel" => complete_tunnel(&mut ctx),
+            "command" => complete_command(&mut ctx),
             // Unsupported subcommand
             _ => vec![],
         }
     };
 
     // Filter matching subcommands
-    input.complete_subcommand(completions.iter().map(String::as_str))
+    input.complete_subcommand(completions)
 }
 
-fn complete_connection(
-    mut ctx: Context,
-    connection_names: Vec<String>,
+fn complete_connection<'t>(
+    ctx: &'t mut Context,
+    connection_names: Vec<&'t str>,
     options: &'static [CliOption],
-) -> Vec<String> {
+) -> Vec<&'t str> {
     let (connection_name, is_current_arg) = ctx.next_arg().unwrap();
     log::info!("Connection name: {:?}", connection_name);
-
     if is_current_arg {
         connection_names
     } else {
@@ -108,42 +98,42 @@ fn complete_connection(
     }
 }
 
-fn complete_rdp(ctx: Context) -> Vec<String> {
+fn complete_rdp<'t>(ctx: &'t mut Context) -> Vec<&'t str> {
     let possibilities = ctx
         .config
         .rdp
         .iter()
-        .map(|r| r.name.to_owned())
+        .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
     complete_connection(ctx, possibilities, RDP_OPTIONS)
 }
 
-fn complete_ssh(ctx: Context) -> Vec<String> {
+fn complete_ssh<'t>(ctx: &'t mut Context) -> Vec<&'t str> {
     let possibilities = ctx
         .config
         .ssh
         .iter()
-        .map(|r| r.name.to_owned())
+        .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
     complete_connection(ctx, possibilities, SSH_OPTIONS)
 }
 
-fn complete_tunnel(ctx: Context) -> Vec<String> {
+fn complete_tunnel<'t>(ctx: &'t mut Context) -> Vec<&'t str> {
     let possibilities = ctx
         .config
         .tunnels
         .iter()
-        .map(|r| r.name.to_owned())
+        .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
     complete_connection(ctx, possibilities, SSH_OPTIONS)
 }
 
-fn complete_command(ctx: Context) -> Vec<String> {
+fn complete_command<'t>(ctx: &'t mut Context) -> Vec<&'t str> {
     let possibilities = ctx
         .config
         .commands
         .iter()
-        .map(|r| r.name.to_owned())
+        .map(|r| r.name.as_str())
         .collect::<Vec<_>>();
     complete_connection(ctx, possibilities, SSH_OPTIONS)
 }
@@ -160,19 +150,14 @@ impl CliOption {
 
     /// All possible representation of the option
     fn representations(&self) -> HashSet<&'static str> {
-        self.long
-            .iter()
-            .chain(self.short.iter())
-            .map(|x| *x)
-            .collect()
+        self.long.iter().chain(self.short.iter()).copied().collect()
     }
 
     /// Suggest long if possible otherwise short
-    fn suggestion(&self) -> String {
+    fn suggestion(&self) -> &'static str {
         self.long
             .iter()
             .chain(self.short.iter())
-            .map(ToString::to_string)
             .next()
             .expect("Option should have either long or short")
     }
@@ -254,6 +239,7 @@ mod tests {
             // Command
             TestCase::new("remotec command |", &["command_example"]),
             TestCase::new("remotec command comma|", &["command_example"]),
+            TestCase::new("remotec command 'comma|", &["command_example"]),
         ];
 
         for (idx, case) in cases.iter().enumerate() {

@@ -1,19 +1,17 @@
-mod address;
 mod command;
-mod config;
 mod rdp;
 mod select;
 mod ssh;
 mod tunnel;
 
 use crate::command::launch_command;
-use crate::config::Config;
 use crate::rdp::launch_rdp;
 use crate::ssh::launch_ssh;
 use crate::tunnel::launch_tunnel;
 use anyhow::Context;
 use clap::{Args, Parser};
 use env_logger::{Env, Target};
+use remotec::config::Config;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -122,7 +120,7 @@ fn run(args: Cli) -> anyhow::Result<()> {
         Subcommand::Tunnel(tunnel) => launch_tunnel(&config, &tunnel),
         Subcommand::Command(cmd) => launch_command(&config, &cmd),
         Subcommand::Config => {
-            let cfg_path = config::config_path()?;
+            let cfg_path = remotec::config::config_path()?;
             open::that(cfg_path).context("Unable to open config file")
         }
     }?;

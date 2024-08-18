@@ -38,7 +38,7 @@ pub struct SshDefaults {
     pub username: Option<String>,
 }
 
-/// At present we only support launching the Microsoft Windows Remote Desktop client (mstsc.exe)
+/// At present, we only support launching the Microsoft Windows Remote Desktop client (mstsc.exe)
 /// But in future we could support Linux clients etc.
 #[derive(Debug, Deserialize, Serialize, Copy, Clone)]
 pub enum RdpBackend {
@@ -52,6 +52,29 @@ pub struct Address {
     pub ipv4: Option<String>,
     pub ipv6: Option<String>,
     pub port: Option<u16>,
+}
+
+impl Address {
+    pub fn choose_address(&self, force_ipv4: bool, force_ipv6: bool) -> anyhow::Result<&str> {
+        if force_ipv4 {
+            return self
+                .ipv4
+                .as_deref()
+                .context("An IPv4 address is not configured for this profile");
+        }
+        if force_ipv6 {
+            return self
+                .ipv6
+                .as_deref()
+                .context("An IPv6 address is not configured for this profile");
+        }
+        [&self.hostname, &self.ipv6, &self.ipv4]
+            .into_iter()
+            .flat_map(|x| x.iter())
+            .next()
+            .map(|x| x.as_str())
+            .context("No addresses configured for this profile")
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
