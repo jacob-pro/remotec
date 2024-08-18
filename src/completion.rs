@@ -66,7 +66,7 @@ fn get_completions(config: &Config, input: &BashCompletionInput) -> Vec<String> 
     log::info!("Subcommand: {}", subcommand);
 
     let completions = if is_current_arg {
-        vec!["rdp", "ssh", "tunnel", "command", "config"]
+        vec!["rdp", "ssh", "tunnel", "command", "config", "list"]
     } else {
         match subcommand {
             "rdp" => complete_rdp(&mut ctx),
@@ -210,10 +210,10 @@ mod tests {
 
         let cases = &[
             // Subcommands
-            TestCase::new("remotec |", &["rdp", "ssh", "tunnel", "command", "config"]),
+            TestCase::new("remotec |", &["rdp", "ssh", "tunnel", "command", "config", "list"]),
             TestCase::new(
                 "remotec |rdp",
-                &["rdp", "ssh", "tunnel", "command", "config"],
+                &["rdp", "ssh", "tunnel", "command", "config", "list"],
             ),
             TestCase::new("remotec co|", &["command", "config"]),
             TestCase::new("remotec co| --after", &["command", "config"]),

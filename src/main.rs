@@ -1,14 +1,17 @@
 mod command;
+mod list;
 mod rdp;
 mod select;
 mod ssh;
 mod tunnel;
 
 use crate::command::launch_command;
+use crate::list::list_profiles;
 use crate::rdp::launch_rdp;
 use crate::ssh::launch_ssh;
 use crate::tunnel::launch_tunnel;
 use anyhow::Context;
+use clap::clap_derive::ArgEnum;
 use clap::{Args, Parser};
 use env_logger::{Env, Target};
 use remotec::config::Config;
@@ -32,6 +35,8 @@ enum Subcommand {
     Command(Command),
     /// Open config file
     Config,
+    /// List configured profiles
+    List(List),
 }
 
 #[derive(Args)]
@@ -94,6 +99,21 @@ pub struct Tunnel {
 }
 
 #[derive(Args)]
+pub struct List {
+    /// Type of profile to list
+    #[clap(arg_enum)]
+    profile_type: Option<ProfileType>,
+}
+
+#[derive(ArgEnum, Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ProfileType {
+    Rdp,
+    Ssh,
+    Tunnel,
+    Command,
+}
+
+#[derive(Args)]
 pub struct Command {
     /// Name of the command to run
     name: String,
@@ -123,6 +143,7 @@ fn run(args: Cli) -> anyhow::Result<()> {
             let cfg_path = remotec::config::config_path()?;
             open::that(cfg_path).context("Unable to open config file")
         }
+        Subcommand::List(list) => list_profiles(&config, list.profile_type),
     }?;
     Ok(())
 }

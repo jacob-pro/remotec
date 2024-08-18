@@ -1,12 +1,30 @@
+use crate::ProfileType;
 use anyhow::Context;
 use remotec::config::{CommandProfile, RdpProfile, SshProfile, TunnelProfile};
+use std::fmt::{Display, Formatter};
+
+impl Display for ProfileType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProfileType::Rdp => f.write_str("RDP"),
+            ProfileType::Ssh => f.write_str("SSH"),
+            ProfileType::Tunnel => f.write_str("Tunnel"),
+            ProfileType::Command => f.write_str("Command"),
+        }
+    }
+}
 
 pub trait NamedProfile {
+    fn profile_type(&self) -> ProfileType;
     fn name(&self) -> &str;
     fn description(&self) -> Option<&str>;
 }
 
 impl NamedProfile for RdpProfile {
+    fn profile_type(&self) -> ProfileType {
+        ProfileType::Rdp
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -17,6 +35,10 @@ impl NamedProfile for RdpProfile {
 }
 
 impl NamedProfile for SshProfile {
+    fn profile_type(&self) -> ProfileType {
+        ProfileType::Ssh
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -27,6 +49,10 @@ impl NamedProfile for SshProfile {
 }
 
 impl NamedProfile for TunnelProfile {
+    fn profile_type(&self) -> ProfileType {
+        ProfileType::Tunnel
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -37,6 +63,10 @@ impl NamedProfile for TunnelProfile {
 }
 
 impl NamedProfile for CommandProfile {
+    fn profile_type(&self) -> ProfileType {
+        ProfileType::Command
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
