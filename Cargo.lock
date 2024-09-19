@@ -417,7 +417,7 @@ dependencies = [
 [[package]]
 name = "shell_completion"
 version = "0.1.0"
-source = "git+https://github.com/jacob-pro/shell_completion.git?rev=46f6b9df32#46f6b9df321f970e5ec0bbba158e0b67206270e3"
+source = "git+https://github.com/JoshMcguigan/shell_completion.git?rev=7a07d42bf6#7a07d42bf616e118c9cd692c0c3b63c05350d2e2"
 
 [[package]]
 name = "strsim"
